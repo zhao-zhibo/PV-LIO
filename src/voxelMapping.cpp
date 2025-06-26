@@ -91,7 +91,8 @@ int    iterCount = 0, feats_down_size = 0, NUM_MAX_ITERATIONS = 0, laserCloudVal
 bool   point_selected_surf[100000] = {0};
 bool   lidar_pushed, flg_first_scan = true, flg_exit = false, flg_EKF_inited;
 bool   scan_pub_en = false, dense_pub_en = false, scan_body_pub_en = false;
-
+bool imuAngularIsDegree = false;
+ofstream fout_tum; // 输出TUM格式的轨迹文件
 
 vector<vector<int>>  pointSearchInd_surf;
 vector<PointVector>  Nearest_Points;
@@ -291,6 +292,11 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
     publish_count ++;
     // cout<<"IMU got at: "<<msg_in->header.stamp.toSec()<<endl;
     sensor_msgs::Imu::Ptr msg(new sensor_msgs::Imu(*msg_in));
+    if(imuAngularIsDegree) {
+        msg -> angular_velocity.x = msg -> angular_velocity.x * (M_PI / 180);
+        msg -> angular_velocity.y = msg -> angular_velocity.x * (M_PI / 180);
+        msg -> angular_velocity.z = msg -> angular_velocity.x * (M_PI / 180);
+    }
 
     if (abs(timediff_lidar_wrt_imu) > 0.1 && time_sync_en)
     {
@@ -539,6 +545,16 @@ void publish_path(const ros::Publisher pubPath)
     set_posestamp(msg_body_pose);
     msg_body_pose.header.stamp = ros::Time().fromSec(lidar_end_time);
     msg_body_pose.header.frame_id = "camera_init";
+
+    // 以TUM格式输出定位结果
+    fout_tum << std::fixed << std::setprecision(6) << lidar_end_time << " "
+            << msg_body_pose.pose.position.x << " "
+            << msg_body_pose.pose.position.y << " "
+            << msg_body_pose.pose.position.z << " "
+            << msg_body_pose.pose.orientation.x << " "
+            << msg_body_pose.pose.orientation.y << " "
+            << msg_body_pose.pose.orientation.z << " "
+            << msg_body_pose.pose.orientation.w << std::endl;
 
     /*** if path is too large, the rvis will crash ***/
     static int jjj = 0;
@@ -815,6 +831,7 @@ int main(int argc, char** argv)
     nh.param<string>("common/lid_topic",lid_topic,"/livox/lidar");
     nh.param<string>("common/imu_topic", imu_topic,"/livox/imu");
     nh.param<bool>("common/time_sync_en", time_sync_en, false);
+    nh.param<bool>("common/imuAngularIsDegree", imuAngularIsDegree, false);
 
     // mapping algorithm params
     nh.param<float>("mapping/det_range",DET_RANGE,300.f);
@@ -881,6 +898,8 @@ int main(int argc, char** argv)
     double epsi[23] = {0.001};
     fill(epsi, epsi+23, 0.001);
     kf.init_dyn_share(get_f, df_dx, df_dw, observation_model_share, NUM_MAX_ITERATIONS, epsi);
+
+    fout_tum.open(DEBUG_FILE_DIR("tum_traj.txt"),ios::out);
 
     /*** ROS subscribe initialization ***/
     ros::Subscriber sub_pcl = p_pre->lidar_type == AVIA ? \
@@ -1086,6 +1105,9 @@ int main(int argc, char** argv)
         status = ros::ok();
         rate.sleep();
     }
+
+
+    fout_tum.close();
 
     return 0;
 }
