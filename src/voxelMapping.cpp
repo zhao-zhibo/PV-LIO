@@ -899,7 +899,7 @@ int main(int argc, char** argv)
     fill(epsi, epsi+23, 0.001);
     kf.init_dyn_share(get_f, df_dx, df_dw, observation_model_share, NUM_MAX_ITERATIONS, epsi);
 
-    fout_tum.open(DEBUG_FILE_DIR("tum_traj.txt"),ios::out);
+    fout_tum.open(DEBUG_FILE_DIR("pv_lio_tum_traj.txt"),ios::out);
 
     /*** ROS subscribe initialization ***/
     ros::Subscriber sub_pcl = p_pre->lidar_type == AVIA ? \
